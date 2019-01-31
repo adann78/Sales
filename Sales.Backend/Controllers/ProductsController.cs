@@ -9,6 +9,7 @@ using System.Web;
 using System.Web.Mvc;
 using Sales.Backend.Models;
 using Sales.Common.Models;
+using Sales.Backend.Content.Helpers;
 
 namespace Sales.Backend.Controllers
 {
@@ -19,7 +20,7 @@ namespace Sales.Backend.Controllers
         // GET: Products
         public async Task<ActionResult> Index()
         {
-            return View(await db.Products.ToListAsync());
+            return View(await db.Products.OrderBy(p=>p.Descripcion).ToListAsync());
         }
 
         // GET: Products/Details/5
@@ -29,7 +30,7 @@ namespace Sales.Backend.Controllers
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            Product product = await db.Products.FindAsync(id);
+            Product product = await this.db.Products.FindAsync(id);
             if (product == null)
             {
                 return HttpNotFound();
@@ -48,26 +49,50 @@ namespace Sales.Backend.Controllers
         // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Create([Bind(Include = "ProductId,Descripcion,Precio,IsAvialable,PublishOn")] Product product)
+        public async Task<ActionResult> Create(ProductView view)
         {
             if (ModelState.IsValid)
             {
+                var pic = string.Empty;
+                var folder = "~/Content/Products";
+
+                if (view.ImageFile != null)
+                {
+                    pic = FilesHelper.UploadPhoto(view.ImageFile, folder);
+                    pic = $"{folder}/{pic}";
+                }
+                var product = this.ToProduct(view,pic);
+
+
                 db.Products.Add(product);
-                await db.SaveChangesAsync();
+                await this.db.SaveChangesAsync();
                 return RedirectToAction("Index");
             }
 
-            return View(product);
+            return View(view);
+        }
+        private Product ToProduct(ProductView view, string pic)
+        {
+            return new Product
+            {
+                Descripcion = view.Descripcion,
+                ImagePath = pic,
+                IsAvialable = view.IsAvialable,
+                Precio = view.Precio,
+                ProductId = view.ProductId,
+                PublishOn = view.PublishOn,
+                Remarks = view.Remarks,
+            };
         }
 
-        // GET: Products/Edit/5
-        public async Task<ActionResult> Edit(int? id)
+            // GET: Products/Edit/5
+            public async Task<ActionResult> Edit(int? id)
         {
             if (id == null)
             {
                 return new HttpStatusCodeResult(HttpStatusCode.BadRequest);
             }
-            Product product = await db.Products.FindAsync(id);
+            var product = await db.Products.FindAsync(id);
             if (product == null)
             {
                 return HttpNotFound();
@@ -80,7 +105,7 @@ namespace Sales.Backend.Controllers
         // more details see https://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<ActionResult> Edit([Bind(Include = "ProductId,Descripcion,Precio,IsAvialable,PublishOn")] Product product)
+        public async Task<ActionResult> Edit([Bind(Include = "ProductId,Descripcion,Remarks,ImagePath,Precio,IsAvialable,PublishOn")] Product product)
         {
             if (ModelState.IsValid)
             {
@@ -105,13 +130,16 @@ namespace Sales.Backend.Controllers
             }
             return View(product);
         }
+        
+            
+        
 
         // POST: Products/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<ActionResult> DeleteConfirmed(int id)
         {
-            Product product = await db.Products.FindAsync(id);
+            var product = await db.Products.FindAsync(id);
             db.Products.Remove(product);
             await db.SaveChangesAsync();
             return RedirectToAction("Index");
